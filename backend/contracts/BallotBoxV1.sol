@@ -38,13 +38,13 @@ contract BallotBoxV1 is ERC2771Context {
         Ballot storage ballot = _ballots[proposalId];
         ballot.params = params;
         ballot.active = true;
-        for (uint8 i; i < params.outcomes.length; ++i) ballot.voteCounts[i + 1] = 1; // gas usage side-channel resistance:
+        for (uint8 i; i < params.numChoices; ++i) ballot.voteCounts[i + 1] = 1; // gas usage side-channel resistance:
     }
 
     function castVote(ProposalId proposalId, uint256 choiceIdBig) external {
         Ballot storage ballot = _ballots[proposalId];
         uint8 choiceId = uint8(choiceIdBig & 0xff);
-        require(choiceId > 0 && choiceId < ballot.params.outcomes.length, "unknown choice");
+        require(choiceId > 0 && choiceId < ballot.params.numChoices, "unknown choice");
         require(ballot.active, "not active");
         require(ballot.votes[_msgSender()] == 0, "already voted");
         ballot.voteCounts[choiceId] += 1;
@@ -56,7 +56,7 @@ contract BallotBoxV1 is ERC2771Context {
         uint256 topChoice;
         uint256 topChoiceCount;
         uint256 totalVotes;
-        for (uint8 i; i < ballot.params.outcomes.length; ++i) {
+        for (uint8 i; i < ballot.params.numChoices; ++i) {
             uint256 choiceVoteCount = ballot.voteCounts[i + 1] - 1;
             totalVotes += choiceVoteCount;
             if (choiceVoteCount > topChoiceCount) {

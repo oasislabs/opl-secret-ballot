@@ -6,17 +6,9 @@ type ProposalId is bytes32;
 struct ProposalParams {
     bytes32 ipfsHash;
     address ballotBox;
-    address treasuryToken;
-    Outcome[] outcomes;
+    uint8 numChoices;
     Termination termination;
     bool publishVotes;
-}
-
-library ParamsLib {
-    function maxPayment(ProposalParams memory params) internal pure returns (uint256 payment) {
-        for (uint256 i; i < params.outcomes.length; ++i)
-            if (params.outcomes[i].payment > payment) payment = params.outcomes[i].payment;
-    }
 }
 
 struct Outcome {
