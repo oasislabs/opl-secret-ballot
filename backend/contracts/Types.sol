@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+error NotTerminated();
+error AlreadyTerminated();
+error NotPublishingVotes();
+error AlreadyVoted();
+error NoVoteWeight();
+error UnknownChoice();
+
 type ProposalId is bytes32;
 
 struct ProposalParams {
-    bytes32 ipfsHash;
-    address ballotBox;
-    uint8 numChoices;
+    string ipfsHash;
+    uint16 numChoices;
+    uint32 snapshotId;
     Termination termination;
     bool publishVotes;
 }
@@ -17,23 +24,23 @@ struct Outcome {
 }
 
 struct Termination {
-    Quantifier quantifier;
+    Conjunction conjunction;
     uint32 quorum;
-    uint64 expiry;
+    uint64 time;
 }
 
 library TerminationLib {
     function isTerminated(Termination memory t, uint256 totalVotes) internal view returns (bool) {
         return
-            (t.quantifier == Quantifier.All &&
-                block.timestamp > t.expiry &&
+            (t.conjunction == Conjunction.All &&
+                block.timestamp > t.time &&
                 totalVotes >= t.quorum) ||
-            (t.quantifier == Quantifier.Any &&
-                (block.timestamp > t.expiry || totalVotes >= t.quorum));
+            (t.conjunction == Conjunction.Any &&
+                (block.timestamp > t.time || totalVotes >= t.quorum));
     }
 }
 
-enum Quantifier {
+enum Conjunction {
     Unknown,
     Any,
     All

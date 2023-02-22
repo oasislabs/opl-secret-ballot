@@ -3,3 +3,6 @@ export { DAOv1__factory } from '../typechain-types/factories/contracts/DAOv1__fa
 
 export { BallotBoxV1 } from '../typechain-types/contracts/BallotBoxV1';
 export { BallotBoxV1__factory } from '../typechain-types/factories/contracts/BallotBoxV1__factory';
+
+export { VoteToken } from '../typechain-types/contracts/VoteToken';
+export { VoteToken__factory } from '../typechain-types/factories/contracts/VoteToken__factory';
