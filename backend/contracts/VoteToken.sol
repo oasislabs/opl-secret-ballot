@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Snapshot} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract VoteToken is ERC20, ERC20Snapshot, Ownable {
     constructor() ERC20("Vote", "VOTE") {} // solhint-disable-line no-empty-blocks
 
-    function snapshot() external onlyOwner {
+    function snapshot() external {
         _snapshot();
     }
 

@@ -1,0 +1,49 @@
+{
+  "type": "object",
+  "properties": {
+    "poll": {
+      "type": "object",
+      "properties": {
+        "creator": { "type": "string" },
+        "name": { "type": "string" },
+        "snapshot": { "type": "string" },
+        "description": { "type": "string" },
+        "choices": { "type": "array", "items": { "type": "string" } },
+        "termination": {
+          "type": "object",
+          "properties": {
+            "conjunction": {
+              "type": "string",
+              "enum": ["any", "all"]
+            },
+            "quorum": { "type": "string", "nullable": true },
+            "time": { "type": "integer", "minimum": 1, "nullable": true }
+          },
+          "required": ["conjunction"],
+          "anyOf": [{ "required": ["quorum"] }, { "required": ["time"] }],
+          "additionalProperties": false
+        },
+        "options": {
+          "type": "object",
+          "properties": {
+            "publishVotes": { "type": "boolean" }
+          },
+          "required": ["publishVotes"]
+        }
+      },
+      "required": [
+        "creator",
+        "name",
+        "description",
+        "snapshot",
+        "choices",
+        "termination",
+        "options"
+      ],
+      "additionalProperties": false
+    },
+    "turnstile": { "type": "string", "nullable": true }
+  },
+  "required": ["poll"],
+  "additionalProperties": false
+}

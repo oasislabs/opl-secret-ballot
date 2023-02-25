@@ -1,75 +1,104 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@oasisprotocol/sapphire-contracts/contracts/opl/Host.sol";
-import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
+import {Host, Result} from "@oasisprotocol/sapphire-contracts/contracts/OPL.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ERC20Snapshot} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Snapshot.sol";
 
-import "./Types.sol";
+import "./Types.sol"; // solhint-disable-line no-global-import
 
 contract DAOv1 is Host {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using TerminationLib for Termination;
 
+    error AlreadyExists();
+    error MissingVotingToken();
+    error NoChoices();
+    error TooManyChoices();
+
     event ProposalClosed(ProposalId id, uint256 topChoice);
 
     struct Proposal {
         bool active;
+        uint16 topChoice;
         ProposalParams params;
     }
 
-    address public immutable _votingToken;
-    mapping(ProposalId => Proposal) public _proposals;
-    EnumerableSet.Bytes32Set private _activeProposals;
+    struct ProposalWithId {
+        ProposalId id;
+        Proposal proposal;
+    }
 
-    constructor(address ballotBox, address votingToken) Host(ballotBox) {
-        require(votingToken != address(0), "missing voting token");
-        _votingToken = votingToken;
+    address public immutable votingToken;
+    mapping(ProposalId => Proposal) public proposals;
+    EnumerableSet.Bytes32Set private activeProposals;
+    ProposalId[] private pastProposals;
+
+    constructor(address _ballotBox, address _votingToken) Host(_ballotBox) {
+        if (_votingToken == address(0)) revert MissingVotingToken();
+        votingToken = _votingToken;
         registerEndpoint("ballotClosed", _oplBallotClosed);
     }
 
     function createProposal(ProposalParams calldata _params) external returns (ProposalId) {
         bytes32 proposalHash = keccak256(abi.encode(msg.sender, _params));
         ProposalId proposalId = ProposalId.wrap(proposalHash);
-        require(_params.numChoices > 0, "no choices");
-        require(!_proposals[proposalId].active, "proposal already exists");
-        require(!_params.termination.isTerminated(0), "already terminated");
-        Proposal storage proposal = _proposals[proposalId];
+        if (_params.numChoices == 0) revert NoChoices();
+        if (_params.numChoices > type(uint16).max) revert TooManyChoices();
+        if (proposals[proposalId].active) revert AlreadyExists();
+        if (_params.termination.isTerminated(0)) revert NotActive();
+        Proposal storage proposal = proposals[proposalId];
         proposal.params = _params;
         proposal.active = true;
-        _activeProposals.add(proposalHash);
+        activeProposals.add(proposalHash);
         return proposalId;
     }
 
-    function pushVoteWeight(address whom, uint256 snapshotId) external {
-        ERC20Snapshot snap = ERC20Snapshot(_votingToken);
-        postMessage(
-            "voteWeight",
-            abi.encode(
-                snapshotId,
-                whom,
-                snap.balanceOfAt(whom, snapshotId),
-                snap.totalSupplyAt(snapshotId)
-            )
-        );
+    function pushVoteWeight(address _whom, uint256 _snapshotId) external returns (bool) {
+        ERC20Snapshot snap = ERC20Snapshot(votingToken);
+        postMessage("voteWeight", abi.encode(
+            _snapshotId,
+            _whom,
+            snap.balanceOfAt(_whom, _snapshotId),
+            snap.totalSupplyAt(_snapshotId)
+        ));
+        return true;
     }
 
-    function getActiveProposals(uint256 _offset, uint256 _count)
-        external
-        view
-        returns (ProposalId[] memory)
-    {
-        ProposalId[] memory ids = new ProposalId[](_count);
-        for (uint256 i; i < _count; ++i) {
-            ids[i] = ProposalId.wrap(_activeProposals.at(_offset + i));
+    function getActiveProposals(
+        uint256 _offset,
+        uint256 _count
+    ) external view returns (ProposalWithId[] memory _proposals) {
+        if (_offset + _count > activeProposals.length()) {
+            _count = activeProposals.length() - _offset;
         }
-        return ids;
+        _proposals = new ProposalWithId[](_count);
+        for (uint256 i; i < _count; ++i) {
+            ProposalId id = ProposalId.wrap(activeProposals.at(_offset + i));
+            _proposals[i] = ProposalWithId({id: id, proposal: proposals[id]});
+        }
+    }
+
+    function getPastProposals(
+        uint256 _offset,
+        uint256 _count
+    ) external view returns (ProposalWithId[] memory _proposals) {
+        if (_offset + _count > pastProposals.length) {
+            _count = pastProposals.length - _offset;
+        }
+        _proposals = new ProposalWithId[](_count);
+        for (uint256 i; i < _count; ++i) {
+            ProposalId id = pastProposals[_offset + i];
+            _proposals[i] = ProposalWithId({id: id, proposal: proposals[id]});
+        }
     }
 
     function _oplBallotClosed(bytes calldata _args) internal returns (Result) {
-        (ProposalId proposalId, uint256 topChoice) = abi.decode(_args, (ProposalId, uint256));
-        _activeProposals.remove(ProposalId.unwrap(proposalId));
-        delete _proposals[proposalId];
+        (ProposalId proposalId, uint16 topChoice) = abi.decode(_args, (ProposalId, uint16));
+        proposals[proposalId].topChoice = topChoice;
+        proposals[proposalId].active = false;
+        activeProposals.remove(ProposalId.unwrap(proposalId));
+        pastProposals.push(proposalId);
         emit ProposalClosed(proposalId, topChoice);
         return Result.Success;
     }
