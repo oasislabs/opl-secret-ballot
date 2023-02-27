@@ -40,7 +40,7 @@ contract DAOv1 is Host {
         registerEndpoint("ballotClosed", _oplBallotClosed);
     }
 
-    function createProposal(ProposalParams calldata _params) external returns (ProposalId) {
+    function createProposal(ProposalParams calldata _params) external payable returns (ProposalId) {
         bytes32 proposalHash = keccak256(abi.encode(msg.sender, _params));
         ProposalId proposalId = ProposalId.wrap(proposalHash);
         if (_params.numChoices == 0) revert NoChoices();
@@ -51,17 +51,21 @@ contract DAOv1 is Host {
         proposal.params = _params;
         proposal.active = true;
         activeProposals.add(proposalHash);
+        postMessage("createBallot", abi.encode(proposalId, _params));
         return proposalId;
     }
 
-    function pushVoteWeight(address _whom, uint256 _snapshotId) external returns (bool) {
+    function pushVoteWeight(address _whom, uint256 _snapshotId) external payable returns (bool) {
         ERC20Snapshot snap = ERC20Snapshot(votingToken);
-        postMessage("voteWeight", abi.encode(
-            _snapshotId,
-            _whom,
-            snap.balanceOfAt(_whom, _snapshotId),
-            snap.totalSupplyAt(_snapshotId)
-        ));
+        postMessage(
+            "voteWeight",
+            abi.encode(
+                _snapshotId,
+                _whom,
+                snap.balanceOfAt(_whom, _snapshotId),
+                snap.totalSupplyAt(_snapshotId)
+            )
+        );
         return true;
     }
 

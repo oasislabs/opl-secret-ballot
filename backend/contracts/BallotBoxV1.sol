@@ -39,19 +39,14 @@ contract BallotBoxV1 is Enclave {
     mapping(ProposalId => Ballot) private _ballots;
 
     constructor(address dao) Enclave(dao, autoswitch("bsc")) {
+        registerEndpoint("createBallot", _oplCreateBallot);
         registerEndpoint("voteWeight", _oplReceiveVoteWeights);
     }
 
-    function createBallot(ProposalParams calldata _params) external {
-        ProposalId proposalId = ProposalId.wrap(keccak256(abi.encode(msg.sender, _params)));
-        require(!_ballots[proposalId].active, "ballot already exists");
-        Ballot storage ballot = _ballots[proposalId];
-        ballot.params = _params;
-        ballot.active = true;
-        for (uint256 i; i < _params.numChoices; ++i) ballot.weightedVoteCounts[i] = 1 << 255; // gas usage side-channel resistance.
-    }
-
-    function castVote(ProposalId proposalId, uint256 choiceIdBig) external returns (bool ended) {
+    function castVote(
+        ProposalId proposalId,
+        uint256 choiceIdBig
+    ) external payable returns (bool ended) {
         Ballot storage ballot = _ballots[proposalId];
         if (!ballot.active) revert NotActive();
         uint256 voteWeight = _snapshots[ballot.params.snapshotId].weights[_msgSender()];
@@ -96,6 +91,18 @@ contract BallotBoxV1 is Enclave {
         if (ballot.active) revert NotTerminated();
         if (!ballot.params.publishVotes) revert NotPublishingVotes();
         return ballot.votes[voter];
+    }
+
+    function _oplCreateBallot(bytes calldata args) internal returns (Result) {
+        (ProposalId id, ProposalParams memory params) = abi.decode(
+            args,
+            (ProposalId, ProposalParams)
+        );
+        Ballot storage ballot = _ballots[id];
+        ballot.params = params;
+        ballot.active = true;
+        for (uint256 i; i < params.numChoices; ++i) ballot.weightedVoteCounts[i] = 1 << 255; // gas usage side-channel resistance.
+        return Result.Success;
     }
 
     /// @dev This function receives vote weights from the home chain. If you're using an oracle to push this data, or a voting token on Sapphire, you don't need this method.
