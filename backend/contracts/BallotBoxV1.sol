@@ -93,6 +93,10 @@ contract BallotBoxV1 is Enclave {
         return ballot.votes[voter];
     }
 
+    function ballotIsActive(ProposalId id) external view returns (bool) {
+        return _ballots[id].active;
+    }
+
     function _oplCreateBallot(bytes calldata args) internal returns (Result) {
         (ProposalId id, ProposalParams memory params) = abi.decode(
             args,

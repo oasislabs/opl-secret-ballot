@@ -1,13 +1,7 @@
 <script setup lang="ts">
-import { watch } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 
 import AccountPicker from './components/AccountPicker.vue';
-import { Network, useEthereumStore } from './stores/ethereum';
-
-const eth = useEthereumStore();
-
-watch(eth, async (eth) => eth.switchNetwork(Network.Host));
 </script>
 
 <template>

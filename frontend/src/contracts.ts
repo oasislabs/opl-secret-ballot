@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import type { ComputedRef } from 'vue';
 import { computed } from 'vue';
 
@@ -8,9 +9,31 @@ import {
   VoteToken__factory,
 } from '@oasislabs/secret-ballot-backend';
 
-import { useEthereumStore } from './stores/ethereum';
+import { Network, useEthereumStore } from './stores/ethereum';
 
 export type { BallotBoxV1, DAOv1, VoteToken } from '@oasislabs/secret-ballot-backend';
+
+const hostProvider = new ethers.providers.JsonRpcProvider(
+  import.meta.env.VITE_HOST_WEB3_GATEWAY,
+  'any',
+);
+const enclaveProvider = new ethers.providers.JsonRpcProvider(
+  import.meta.env.VITE_ENCLAVE_WEB3_GATEWAY,
+  'any',
+);
+
+export const staticBallotBox = BallotBoxV1__factory.connect(
+  import.meta.env.VITE_BALLOT_BOX_V1_ADDR!,
+  enclaveProvider,
+);
+export const staticVoteToken = VoteToken__factory.connect(
+  import.meta.env.VITE_VOTE_TOKEN_ADDR!,
+  hostProvider,
+);
+export const staticDAOv1 = DAOv1__factory.connect(
+  import.meta.env.VITE_DAO_V1_ADDR!,
+  hostProvider,
+);
 
 export function useBallotBoxV1(): ComputedRef<{
   read: BallotBoxV1;
@@ -19,34 +42,27 @@ export function useBallotBoxV1(): ComputedRef<{
   const eth = useEthereumStore();
   const addr = import.meta.env.VITE_BALLOT_BOX_V1_ADDR!;
   return computed(() => {
-    const read = BallotBoxV1__factory.connect(addr, eth.provider);
-    const write = eth.signer ? BallotBoxV1__factory.connect(addr, eth.signer) : undefined;
+    const read = BallotBoxV1__factory.connect(addr, enclaveProvider);
+    const write =
+      eth.network === Network.Enclave && eth.signer
+        ? BallotBoxV1__factory.connect(addr, eth.signer)
+        : undefined;
     return { read, write };
   });
 }
 
-export function useDAOv1(): ComputedRef<{
-  read: DAOv1;
-  write?: DAOv1;
-}> {
+export function useDAOv1(): ComputedRef<DAOv1> {
   const eth = useEthereumStore();
   const addr = import.meta.env.VITE_DAO_V1_ADDR!;
   return computed(() => {
-    const read = DAOv1__factory.connect(addr, eth.provider);
-    const write = eth.signer ? DAOv1__factory.connect(addr, eth.signer) : undefined;
-    return { read, write };
+    return DAOv1__factory.connect(addr, eth.signer ?? eth.provider);
   });
 }
 
-export function useVoteToken(): ComputedRef<{
-  read: VoteToken;
-  write?: VoteToken;
-}> {
+export function useVoteToken(): ComputedRef<VoteToken> {
   const eth = useEthereumStore();
   const addr = import.meta.env.VITE_VOTE_TOKEN_ADDR!;
   return computed(() => {
-    const read = VoteToken__factory.connect(addr, eth.provider);
-    const write = eth.signer ? VoteToken__factory.connect(addr, eth.signer) : undefined;
-    return { read, write };
+    return VoteToken__factory.connect(addr, eth.signer ?? eth.provider);
   });
 }

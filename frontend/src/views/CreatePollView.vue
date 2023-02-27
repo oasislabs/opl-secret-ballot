@@ -1,35 +1,40 @@
 <script setup lang="ts">
-import { BigNumber } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { useDAOv1, useBallotBoxV1, useVoteToken } from '../contracts';
+import { staticBallotBox, useDAOv1, useVoteToken } from '../contracts';
 import { Network, useEthereumStore } from '../stores/ethereum';
-import type { Poll } from '../types';
+import type { Poll } from '../../functions/api/types';
 
 const router = useRouter();
 const eth = useEthereumStore();
 const dao = useDAOv1();
 const voteToken = useVoteToken();
-const ballotBox = useBallotBoxV1();
 
 const errors = ref<string[]>([]);
-const pollName = ref('A serious poll about serious matters');
-const pollDesc = ref(
-  'This poll seeks to determine the community sentiment about an issue that is very near to our hearts and minds.',
-);
-const choices = ref(['It is acceptable', 'It is tolerable', 'I will not stand for it']);
+const pollName = ref('');
+const pollDesc = ref('');
+const choices = ref<Array<{ key: number; value: string }>>([]);
 const terminationConjunction = ref('any');
 const terminationDurationFlag = ref(false);
 const terminationDuration = ref<number | undefined>();
 const terminationQuorumFlag = ref(true);
-const terminationQuorum = ref<number | undefined>(66);
+const terminationQuorum = ref<number | undefined>(33);
 const hasTerminationConditionErr = ref(false);
+const createSnapshot = ref(false);
 const publishVotes = ref(false);
 const creating = ref(false);
 
+let choiceCount = 0; // a monotonic counter for use as :key
 const removeChoice = (i: number) => choices.value.splice(i, 1);
-const addChoice = () => choices.value.push('');
+const addChoice = () => {
+  choices.value.push({ key: choiceCount, value: '' });
+  choiceCount++;
+};
+addChoice();
+addChoice();
+addChoice();
 
 async function createPoll(e: Event): Promise<void> {
   if (e.target instanceof HTMLFormElement) {
@@ -52,6 +57,8 @@ async function createPoll(e: Event): Promise<void> {
 }
 
 async function doCreatePoll(): Promise<string> {
+  await eth.connect();
+  await eth.switchNetwork(Network.Host);
   if (!terminationDurationFlag.value && !terminationQuorumFlag.value) {
     errors.value.push('At least one termination condition must be selected.');
     hasTerminationConditionErr.value = true;
@@ -69,27 +76,34 @@ async function doCreatePoll(): Promise<string> {
     }
   }
   if (errors.value.length > 0) return '';
-  await eth.connect();
 
   let terminationTime: number | undefined;
   let terminationVoteWeight: BigNumber | undefined;
   if (terminationDurationFlag.value) {
     terminationTime = Math.round(Date.now() / 1000) + terminationDuration.value! * 60 * 60;
   }
-  const snapshotId = await voteToken.value.read.callStatic.getCurrentSnapshotId();
+  if (createSnapshot.value) {
+    console.log('creating snapshot');
+    const tx = await voteToken.value.snapshot();
+    console.log('snapshot submitted in', tx.hash);
+    const receipt = await tx.wait();
+    if (receipt.status !== 1) throw new Error('failed to create snapshot');
+    console.log('created snapshot');
+  }
+  const snapshotId = await voteToken.value.callStatic.getCurrentSnapshotId();
   if (terminationQuorum.value) {
-    const totalVoteWeight = await voteToken.value.read.callStatic.totalSupplyAt(snapshotId);
+    const totalVoteWeight = await voteToken.value.callStatic.totalSupplyAt(snapshotId);
     const quorum = BigNumber.from(terminationQuorum.value);
     terminationVoteWeight = totalVoteWeight.mul(quorum).div(BigNumber.from(100));
   }
   const poll: Poll = {
-    creator: eth.address,
+    creator: eth.address!,
     name: pollName.value,
     description: pollDesc.value,
-    choices: choices.value,
+    choices: choices.value.map((c) => c.value),
     snapshot: snapshotId.toHexString(),
     termination: {
-      conjunction: terminationConjunction.value,
+      conjunction: terminationConjunction.value as 'any' | 'all',
       time: terminationTime,
       quorum: terminationVoteWeight?.toHexString(),
     },
@@ -117,14 +131,20 @@ async function doCreatePoll(): Promise<string> {
     publishVotes: poll.options.publishVotes,
   };
   // TODO: check if proposal already exists on the host chain and continue if so (idempotence)
-  const proposalId = (await dao.value.read.callStatic.createProposal(proposalParams)).slice(2);
-  const createProposalTx = await dao.value.write!.createProposal(proposalParams);
+  const value = ethers.utils.parseEther('0.005')
+  const proposalId = (await dao.value.callStatic.createProposal(proposalParams, { value })).slice(2);
+  console.log('creating proposal');
+  const createProposalTx = await dao.value.createProposal(proposalParams, { value });
+  console.log('creating proposal in', createProposalTx.hash);
   if ((await createProposalTx.wait()).status !== 1)
     throw new Error('createProposal tx receipt reported failure.');
-  await eth.switchNetwork(Network.Enclave);
-  const createBallotTx = await ballotBox.value.write!.createBallot(proposalParams);
-  if ((await createBallotTx.wait()).status !== 1)
-    throw new Error('createBallot tx receipt reported failure.');
+  while (true) {
+    console.log('checking if ballot has been created on Sapphire');
+    if (await staticBallotBox.callStatic.ballotIsActive(proposalId)) {
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
   return proposalId;
 }
 </script>
@@ -144,8 +164,8 @@ async function doCreatePoll(): Promise<string> {
       <fieldset>
         <legend>Choices</legend>
         <ol class="ml-8 list-decimal">
-          <li class="choice-item" v-for="(choice, i) in choices" :key="choice">
-            <input type="text" required v-model="choices[i]" />
+          <li class="choice-item" v-for="(choice, i) in choices" :key="choice.key">
+            <input type="text" required v-model="choices[i].value" />
             <button
               v-if="choices.length > 1"
               class="inline-block text-lg text-gray-500 pl-1"
@@ -213,6 +233,12 @@ async function doCreatePoll(): Promise<string> {
       <fieldset>
         <legend>Additional Options</legend>
         <ul class="px-3">
+          <li class="my-3">
+            <input id="create-snapshot" type="checkbox" v-model="createSnapshot" />
+            <label class="inline-block mx-3" for="create-snapshot"
+              >Create VOTE token snapshot.</label
+            >
+          </li>
           <li class="my-3">
             <input id="publish-votes" type="checkbox" v-model="publishVotes" />
             <label class="inline-block mx-3" for="publish-votes"

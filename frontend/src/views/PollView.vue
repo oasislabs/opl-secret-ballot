@@ -1,54 +1,73 @@
 <script setup lang="ts">
-import { BigNumber } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { computed, ref, watchEffect } from 'vue';
 import { ContentLoader } from 'vue-content-loader';
 
 import type { Poll } from '../../functions/api/types';
 import type { DAOv1 } from '../contracts';
-import { useDAOv1, useBallotBoxV1, useVoteToken } from '../contracts';
-import { useEthereumStore } from '../stores/ethereum';
+import {
+  staticBallotBox,
+  staticVoteToken,
+  staticDAOv1,
+  useDAOv1,
+  useBallotBoxV1,
+} from '../contracts';
+import { Network, useEthereumStore } from '../stores/ethereum';
 
 const props = defineProps<{ id: string }>();
 const proposalId = `0x${props.id}`;
 
 const daoV1 = useDAOv1();
 const ballotBoxV1 = useBallotBoxV1();
-const voteToken = useVoteToken();
 const eth = useEthereumStore();
 
+const error = ref('');
+const isTransacting = ref(false);
 const poll = ref<{ proposal: DAOv1.ProposalWithIdStructOutput; ipfsParams: Poll } | undefined>(
   undefined,
 );
 const winningChoice = ref<number | undefined>(undefined);
+const selectedChoice = ref<number | undefined>();
+const existingVote = ref<number | undefined>(undefined);
+const voteTokenHoldings = ref<BigNumber | undefined>(undefined);
+const needsPushVoteWeight = ref(true);
+
 (async () => {
-  const [active, topChoice, params] = await daoV1.value.read.callStatic.proposals(proposalId);
+  const [active, topChoice, params] = await daoV1.value.callStatic.proposals(proposalId);
   const proposal = { id: proposalId, active, topChoice, params };
   const ipfsParamsRes = await fetch(`https://w3s.link/ipfs/${params.ipfsHash}/poll.json`);
   const ipfsParams = await ipfsParamsRes.json();
   // TODO: redirect to 404
   poll.value = { proposal, ipfsParams } as any;
-  if (!proposal.active) winningChoice.value = proposal.topChoice;
+  if (!proposal.active) {
+    selectedChoice.value = winningChoice.value = proposal.topChoice;
+  }
 })();
 
-const existingVote = ref<number | undefined>(undefined);
-watchEffect(async () => {
-  if (!eth.address) return;
-  const { exists, choice } = await ballotBoxV1.value.write!.callStatic.getVoteOf(
-    proposalId,
-    eth.address!,
-  );
-  if (exists) existingVote.value = choice;
-});
+// watchEffect(async () => {
+//   if (!eth.address) return;
+//   const { exists, choice } = await ballotBoxV1.value.write!.callStatic.getVoteOf(
+//     proposalId,
+//     eth.address!,
+//   );
+//   if (exists) existingVote.value = choice;
+// });
 
-const voteTokenHoldings = ref<BigNumber | undefined>(undefined);
 watchEffect(async () => {
   if (!eth.address) return;
   if (!poll.value) return;
   const snapshot = poll.value.ipfsParams.snapshot;
-  const balanceAt = await voteToken.value.read.callStatic.balanceOfAt(eth.address, snapshot);
-  console.log('balat', balanceAt);
+  const balanceAt = await staticVoteToken.callStatic.balanceOfAt(eth.address, snapshot);
   voteTokenHoldings.value = balanceAt;
 });
+
+watchEffect(async () => {
+  if (!poll.value) return;
+  needsPushVoteWeight.value = !(await hasPushedVoteWeight());
+});
+
+const hasPushedVoteWeight = async () =>
+  staticBallotBox.callStatic.hasPushedVoteWeight(eth.address!, poll.value!.ipfsParams.snapshot);
 
 const canVote = computed(() => {
   if (!eth.address) return false;
@@ -58,6 +77,7 @@ const canVote = computed(() => {
   if (existingVote.value !== undefined) return false;
   return true;
 });
+
 const canSelect = computed(() => {
   if (winningChoice.value !== undefined) return false;
   if (eth.address === undefined) return true;
@@ -66,55 +86,67 @@ const canSelect = computed(() => {
   return true;
 });
 
-const error = ref('');
-const selectedChoice = ref<number | undefined>();
-const isVoting = ref(false);
+async function pushVoteWeight(e: Event): Promise<void> {
+  e.preventDefault();
+  try {
+    error.value = '';
+    isTransacting.value = true;
+    await doPushVoteWeight();
+    needsPushVoteWeight.value = false;
+  } catch (e: any) {
+    error.value = e.reason ?? e.message;
+  } finally {
+    isTransacting.value = false;
+  }
+}
+
+async function doPushVoteWeight(): Promise<void> {
+  if (!poll.value) return;
+  const tx = await daoV1.value.pushVoteWeight(eth.address!, poll.value.ipfsParams.snapshot, {
+    value: ethers.utils.parseEther('0.01'),
+  });
+  console.log('submitting pushVoteWeight tx to host in', tx);
+  const receipt = await tx?.wait();
+  if (receipt?.status !== 1) throw new Error('push vote weight tx failed');
+  let hasPushed = false;
+  while (!hasPushed) {
+    console.log('checking if vote weight has been pushed');
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    hasPushed = await hasPushedVoteWeight();
+  }
+  console.log('successfully pushed vote weight');
+}
 
 async function vote(e: Event): Promise<void> {
   e.preventDefault();
   try {
     error.value = '';
-    isVoting.value = true;
+    isTransacting.value = true;
     await doVote();
   } catch (e: any) {
     error.value = e.reason ?? e.message;
-    // TODO: set current vote
   } finally {
-    isVoting.value = false;
+    isTransacting.value = false;
   }
 }
 
 async function doVote(): Promise<void> {
   await eth.connect();
-  if (!ballotBoxV1.value.write) throw new Error('signer not connected');
+
   if (selectedChoice.value === undefined) throw new Error('no choice selected');
   if (voteTokenHoldings.value?.eq(0) ?? true) throw new Error('insufficient VOTE balance');
-  const snapshot = poll.value!.ipfsParams.snapshot;
-  const hasPushedVoteWeight = async () =>
-    ballotBoxV1.value.read.callStatic.hasPushedVoteWeight(eth.address!, snapshot);
-  if (!(await hasPushedVoteWeight())) {
-    console.log('pushing vote weight');
-    const tx = await daoV1.value.write?.pushVoteWeight(eth.address!, snapshot);
-    console.log('submitting pushVoteWeight tx to host in', tx);
-    const receipt = await tx?.wait();
-    if (receipt?.status !== 1) throw new Error('push vote weight tx failed');
-    let hasPushed = false;
-    let times = 0;
-    while (!hasPushed) {
-      console.log('checking if vote weight has been pushed');
-      if (times >= 5) throw new Error('failed to push vote weight');
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-      hasPushed = await hasPushedVoteWeight();
-      times++;
-    }
-    console.log('successfully pushed vote weight');
-  }
+
   const choice = selectedChoice.value;
-  const tx = await ballotBoxV1.value.write.castVote(proposalId, choice);
+
+  console.log('casting vote');
+  await eth.switchNetwork(Network.Enclave);
+  const tx = await ballotBoxV1.value.write!.castVote(proposalId, choice, { value: ethers.utils.parseEther('0.01')});
   const receipt = await tx.wait();
+
   if (receipt.status != 1) throw new Error('cast vote tx failed');
   existingVote.value = choice;
 
+  // Check if the ballot has closed by examining the events (logs).
   let topChoice = undefined;
   for (const event of receipt.events ?? []) {
     if (
@@ -126,6 +158,13 @@ async function doVote(): Promise<void> {
   }
   if (topChoice === undefined) return;
   winningChoice.value = topChoice;
+  while (true) {
+    console.log('checking if ballot has been closed on BSC');
+    if (!(await staticDAOv1.callStatic.proposals(proposalId)).active) {
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 eth.connect();
@@ -159,7 +198,7 @@ eth.connect();
           v-for="(choice, choiceId) in poll.ipfsParams.choices"
           :key="choiceId"
           :class="{
-            selected: selectedChoice == choiceId,
+            selected: selectedChoice === choiceId,
             won: choiceId === winningChoice,
             lost: winningChoice !== undefined && choiceId !== winningChoice,
           }"
@@ -204,10 +243,21 @@ eth.connect();
       <button
         tabindex="1"
         class="my-3 border-2 border-blue-800 text-gray-100 rounded-md p-2 bg-blue-600 disabled:border-gray-500 disabled:text-gray-500 disabled:cursor-default disabled:bg-white transition-colors font-bold text-xl"
-        :disabled="!canVote || isVoting"
+        :class="{hidden: needsPushVoteWeight}"
+        :disabled="!canVote || isTransacting"
       >
-        <span v-if="isVoting">Casting…</span>
+        <span v-if="isTransacting">Sending…</span>
+        <span v-else-if="needsPushVoteWeight">Push Vote Weight</span>
         <span v-else>Vote!</span>
+      </button>
+      <button
+        tabindex="1"
+        class="my-3 border-2 border-blue-800 text-gray-100 rounded-md p-2 bg-blue-600 disabled:border-gray-500 disabled:text-gray-500 disabled:cursor-default disabled:bg-white transition-colors font-bold text-xl disabled:hidden"
+        :disabled="!needsPushVoteWeight"
+        @click="pushVoteWeight"
+      >
+        <span v-if="isTransacting">Pushing…</span>
+        <span v-else="needsPushVoteWeight">Push Vote Weight</span>
       </button>
     </form>
   </main>
@@ -218,10 +268,7 @@ eth.connect();
   @apply my-4 border-2 border-black rounded-sm;
 }
 .choice-input:not(.lost).selected {
-  @apply bg-gradient-to-r from-secondary via-transparent;
-}
-.choice-input.lost {
-  @apply bg-gray-300;
+  @apply bg-gradient-to-b from-secondary to-secondary via-transparent;
 }
 .choice-input.won {
   @apply bg-secondary;

@@ -5,7 +5,7 @@ import { ContentLoader } from 'vue-content-loader';
 import type { Poll } from '../../functions/api/types';
 import type { DAOv1 } from '../contracts';
 import { useDAOv1 } from '../contracts';
-import { useEthereumStore } from '../stores/ethereum';
+import { Network, useEthereumStore } from '../stores/ethereum';
 
 const eth = useEthereumStore();
 const dao = useDAOv1();
@@ -18,6 +18,7 @@ async function fetchProposals(
   fetcher: (offset: number, batchSize: number) => Promise<DAOv1.ProposalWithIdStructOutput[]>,
   destination: Record<string, FullProposal>,
 ): Promise<void> {
+  await eth.switchNetwork(Network.Host);
   const batchSize = 100;
   for (let offset = 0; ; offset += batchSize) {
     let proposals: DAOv1.ProposalWithIdStructOutput[] = [];
@@ -33,7 +34,7 @@ async function fetchProposals(
       try {
         const ipfsParamsRes = await fetch(`https://w3s.link/ipfs/${ipfsHash}/poll.json`);
         const params: Poll = await ipfsParamsRes.json();
-        destination[id] = { id, params, proposal: proposal as any };
+        destination[id] = { id, params, proposal } as any;
       } catch (e) {
         console.error('failed to fetch proposal params from IPFS', e);
       }
@@ -45,15 +46,14 @@ async function fetchProposals(
   const { number: blockTag } = await eth.provider.getBlock('latest');
   fetchProposals(
     (offset, batchSize) =>
-      dao.value.read.callStatic.getActiveProposals(offset, batchSize, {
+      dao.value.callStatic.getActiveProposals(offset, batchSize, {
         blockTag,
       }),
     activePolls,
   );
   fetchProposals(
     (offset, batchSize) => {
-      console.log('fofset', offset, 'batchsize', batchSize);
-      return dao.value.read.callStatic.getPastProposals(offset, batchSize, {
+      return dao.value.callStatic.getPastProposals(offset, batchSize, {
         blockTag,
       })
     } ,
@@ -74,7 +74,7 @@ async function fetchProposals(
       <h2>Active Polls</h2>
       <ol v-if="Object.keys(activePolls).length > 0" class="table-auto">
         <li
-          class="border-black border-2 rounded-sm my-5 flex bg-gradient-to-l from-primary"
+          class="border-black border-2 rounded-sm my-5 flex"
           v-for="[pollId, poll] in Object.entries(activePolls)"
           :key="pollId"
           :id="pollId"
@@ -94,7 +94,7 @@ async function fetchProposals(
       <h2>Past Polls</h2>
       <ol v-if="Object.keys(pastPolls).length > 0" class="table-auto">
         <li
-          class="border-black border-2 rounded-sm my-5 flex bg-gradient-to-l from-gray-500"
+          class="border-black border-2 rounded-sm my-5 flex"
           v-for="[pollId, poll] in Object.entries(pastPolls)"
           :id="pollId"
           :key="pollId"

@@ -1,6 +1,6 @@
 import detectEthereumProvider from '@metamask/detect-provider';
 import * as sapphire from '@oasisprotocol/sapphire-paratime';
-import { ethers } from 'ethers';
+import { BigNumber, ethers } from 'ethers';
 import { defineStore } from 'pinia';
 import { markRaw, ref, shallowRef } from 'vue';
 
@@ -16,8 +16,8 @@ export enum Network {
   SapphireMainnet = 0x5afe,
   Local = 1337,
 
-  Enclave = Number.parseInt(import.meta.env.VITE_ENCLAVE_NETWORK, 10),
-  Host = Number.parseInt(import.meta.env.VITE_HOST_NETWORK, 10),
+  Enclave = BigNumber.from(import.meta.env.VITE_ENCLAVE_NETWORK).toNumber(),
+  Host = BigNumber.from(import.meta.env.VITE_HOST_NETWORK).toNumber(),
 }
 
 export enum ConnectionStatus {
@@ -38,13 +38,15 @@ export function networkName(network?: Network): string {
   if (network === Network.EmeraldMainnet) return 'Emerald Mainnet';
   if (network === Network.SapphireTestnet) return 'Sapphire Testnet';
   if (network === Network.SapphireMainnet) return 'Sapphire Mainnet';
+  if (network === Network.BscMainnet) return 'BSC';
+  if (network === Network.BscTestnet) return 'BSC Testnet';
   return 'Unknown Network';
 }
 
 export const useEthereumStore = defineStore('ethereum', () => {
   const signer = shallowRef<ethers.Signer | undefined>(undefined);
   const provider = shallowRef<ethers.providers.Provider>(
-    new ethers.providers.JsonRpcProvider(import.meta.env.VITE_WEB3_GATEWAY),
+    new ethers.providers.JsonRpcProvider(import.meta.env.VITE_HOST_WEB3_GATEWAY, "any"),
   );
   const network = ref(Network.Host);
   const address = ref<string | undefined>(undefined);
@@ -94,7 +96,7 @@ export const useEthereumStore = defineStore('ethereum', () => {
     try {
       await eth.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: ethers.utils.hexlify(network) }],
+        params: [{ chainId: ethers.utils.hexlify(network).replace('0x0', '0x') }],
       });
     } catch (e: any) {
       // This error code indicates that the chain has not been added to MetaMask.
