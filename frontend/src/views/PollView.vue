@@ -140,7 +140,9 @@ async function doVote(): Promise<void> {
 
   console.log('casting vote');
   await eth.switchNetwork(Network.Enclave);
-  const tx = await ballotBoxV1.value.write!.castVote(proposalId, choice, { value: ethers.utils.parseEther('0.01')});
+  const tx = await ballotBoxV1.value.write!.castVote(proposalId, choice, {
+    value: ethers.utils.parseEther('0.01'),
+  });
   const receipt = await tx.wait();
 
   if (receipt.status != 1) throw new Error('cast vote tx failed');
@@ -158,12 +160,11 @@ async function doVote(): Promise<void> {
   }
   if (topChoice === undefined) return;
   winningChoice.value = topChoice;
-  while (true) {
+  let hasClosed = false;
+  while (!hasClosed) {
     console.log('checking if ballot has been closed on BSC');
-    if (!(await staticDAOv1.callStatic.proposals(proposalId)).active) {
-      break;
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    hasClosed = !(await staticDAOv1.callStatic.proposals(proposalId)).active;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }
 
@@ -243,7 +244,7 @@ eth.connect();
       <button
         tabindex="1"
         class="my-3 border-2 border-blue-800 text-gray-100 rounded-md p-2 bg-blue-600 disabled:border-gray-500 disabled:text-gray-500 disabled:cursor-default disabled:bg-white transition-colors font-bold text-xl"
-        :class="{hidden: needsPushVoteWeight}"
+        :class="{ hidden: needsPushVoteWeight }"
         :disabled="!canVote || isTransacting"
       >
         <span v-if="isTransacting">Sending…</span>
@@ -257,7 +258,7 @@ eth.connect();
         @click="pushVoteWeight"
       >
         <span v-if="isTransacting">Pushing…</span>
-        <span v-else="needsPushVoteWeight">Push Vote Weight</span>
+        <span v-else-if="needsPushVoteWeight">Push Vote Weight</span>
       </button>
     </form>
   </main>

@@ -111,7 +111,7 @@ async function doCreatePoll(): Promise<string> {
       publishVotes: publishVotes.value,
     },
   };
-  const res = await fetch('http://localhost:8788/api/polls', {
+  const res = await fetch('/api/polls', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ poll }),
@@ -131,19 +131,20 @@ async function doCreatePoll(): Promise<string> {
     publishVotes: poll.options.publishVotes,
   };
   // TODO: check if proposal already exists on the host chain and continue if so (idempotence)
-  const value = ethers.utils.parseEther('0.005')
-  const proposalId = (await dao.value.callStatic.createProposal(proposalParams, { value })).slice(2);
+  const value = ethers.utils.parseEther('0.005');
+  const proposalId = (await dao.value.callStatic.createProposal(proposalParams, { value })).slice(
+    2,
+  );
   console.log('creating proposal');
   const createProposalTx = await dao.value.createProposal(proposalParams, { value });
   console.log('creating proposal in', createProposalTx.hash);
   if ((await createProposalTx.wait()).status !== 1)
     throw new Error('createProposal tx receipt reported failure.');
-  while (true) {
+  let isActive = false;
+  while (!isActive) {
     console.log('checking if ballot has been created on Sapphire');
-    if (await staticBallotBox.callStatic.ballotIsActive(proposalId)) {
-      break;
-    }
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    isActive = await staticBallotBox.callStatic.ballotIsActive(proposalId);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return proposalId;
 }

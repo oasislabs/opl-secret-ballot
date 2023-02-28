@@ -30,10 +30,7 @@ export const staticVoteToken = VoteToken__factory.connect(
   import.meta.env.VITE_VOTE_TOKEN_ADDR!,
   hostProvider,
 );
-export const staticDAOv1 = DAOv1__factory.connect(
-  import.meta.env.VITE_DAO_V1_ADDR!,
-  hostProvider,
-);
+export const staticDAOv1 = DAOv1__factory.connect(import.meta.env.VITE_DAO_V1_ADDR!, hostProvider);
 
 export function useBallotBoxV1(): ComputedRef<{
   read: BallotBoxV1;

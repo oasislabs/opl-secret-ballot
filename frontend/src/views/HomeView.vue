@@ -51,14 +51,11 @@ async function fetchProposals(
       }),
     activePolls,
   );
-  fetchProposals(
-    (offset, batchSize) => {
-      return dao.value.callStatic.getPastProposals(offset, batchSize, {
-        blockTag,
-      })
-    } ,
-    pastPolls,
-  );
+  fetchProposals((offset, batchSize) => {
+    return dao.value.callStatic.getPastProposals(offset, batchSize, {
+      blockTag,
+    });
+  }, pastPolls);
 })();
 </script>
 
@@ -104,7 +101,8 @@ async function fetchProposals(
               <span class="font-bold">Name:</span> {{ poll.params.name }}<br />
               <span class="font-bold">Description:</span> {{ poll.params.description }}<br />
               <span class="font-bold">Creator:</span> {{ poll.params.creator?.replace('0x', '') }}
-              <span class="font-bold">Outcome:</span> {{ poll.params.choices[poll.proposal.topChoice] }}
+              <span class="font-bold">Outcome:</span>
+              {{ poll.params.choices[poll.proposal.topChoice] }}
             </p>
           </RouterLink>
         </li>

@@ -2,9 +2,6 @@ lockfileVersion: 5.4
 
 importers:
 
-  .:
-    specifiers: {}
-
   backend:
     specifiers:
       '@ethersproject/abi': ^5.7.0
