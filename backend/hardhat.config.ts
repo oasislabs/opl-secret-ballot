@@ -47,7 +47,7 @@ task('deploy-vote-token').setAction(async (_args, hre) => {
   return voteToken.address;
 });
 
-task('deploy-enclave')
+task('deploy-ballot-box')
   .addParam('hostNetwork')
   .setAction(async (args, hre) => {
     await hre.run('compile');
@@ -71,13 +71,13 @@ task('deploy-enclave')
     return ballotBox.address;
   });
 
-task('deploy-host')
+task('deploy-dao')
   .addParam('voteTokenAddr')
-  .addParam('enclaveAddr')
+  .addParam('ballotBoxAddr')
   .setAction(async (args, hre) => {
     await hre.run('compile');
     const DAOv1 = await hre.ethers.getContractFactory('DAOv1');
-    const dao = await DAOv1.deploy(args.enclaveAddr, args.voteTokenAddr);
+    const dao = await DAOv1.deploy(args.ballotBoxAddr, args.voteTokenAddr);
     await dao.deployed();
     console.log('DAO', dao.address);
     return dao;
@@ -86,8 +86,8 @@ task('deploy-host')
 task('deploy-local').setAction(async (_args, hre) => {
   await hre.run('compile');
   const voteToken = await hre.run('deploy-vote-token');
-  const ballotBox = await hre.run('deploy-enclave', { hostNetwork: 'local' });
-  await hre.run('deploy-host', {
+  const ballotBox = await hre.run('deploy-ballot-box', { hostNetwork: 'local' });
+  await hre.run('deploy-dao', {
     enclaveAddr: ballotBox,
     voteTokenAddr: voteToken,
   });
