@@ -3,7 +3,7 @@ import { BigNumber, ethers } from 'ethers';
 import { computed, ref, watchEffect } from 'vue';
 import { ContentLoader } from 'vue-content-loader';
 
-import type { Poll } from '../../functions/api/types';
+import type { Poll } from '../../../functions/api/types';
 import type { DAOv1 } from '../contracts';
 import {
   staticBallotBox,

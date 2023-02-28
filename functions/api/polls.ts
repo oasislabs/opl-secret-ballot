@@ -71,7 +71,6 @@ async function pin(
   poll: Poll,
 ): Promise<{ ipfsHash: string }> {
   if (web3StorageKey) {
-    console.log('posting to web3.storage');
     const client = new Web3Storage({ token: web3StorageKey });
     const file = new File([JSON.stringify(poll)], 'poll.json', { type: 'application/json' });
     const ipfsHash = await client.put([file]);

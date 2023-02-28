@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router';
 
 import { staticBallotBox, useDAOv1, useVoteToken } from '../contracts';
 import { Network, useEthereumStore } from '../stores/ethereum';
-import type { Poll } from '../../functions/api/types';
+import type { Poll } from '../../../functions/api/types';
 
 const router = useRouter();
 const eth = useEthereumStore();

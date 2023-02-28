@@ -2,6 +2,9 @@ lockfileVersion: 5.4
 
 importers:
 
+  .:
+    specifiers: {}
+
   backend:
     specifiers:
       '@ethersproject/abi': ^5.7.0
@@ -63,7 +66,6 @@ importers:
 
   frontend:
     specifiers:
-      '@cloudflare/workers-types': ^4.20221111.1
       '@metamask/detect-provider': ^2.0.0
       '@metamask/jazzicon': ^2.0.0
       '@oasislabs/secret-ballot-backend': workspace:^1.0.0
@@ -94,7 +96,6 @@ importers:
       vue-content-loader: ^2.0.1
       vue-router: ^4.1.6
       vue-tsc: ^1.0.13
-      web3.storage: ^4.4.0
     dependencies:
       '@metamask/detect-provider': 2.0.0
       '@metamask/jazzicon': 2.0.0
@@ -105,9 +106,7 @@ importers:
       vue: 3.2.45
       vue-content-loader: 2.0.1_vue@3.2.45
       vue-router: 4.1.6_vue@3.2.45
-      web3.storage: 4.4.0
     devDependencies:
-      '@cloudflare/workers-types': 4.20221111.1
       '@rushstack/eslint-patch': 1.2.0
       '@types/node': 16.18.10
       '@vitejs/plugin-vue': 3.2.0_vite@3.2.5+vue@3.2.45
@@ -129,6 +128,15 @@ importers:
       typescript: 4.7.4
       vite: 3.2.5_@types+node@16.18.10
       vue-tsc: 1.0.13_typescript@4.7.4
+
+  functions:
+    specifiers:
+      '@cloudflare/workers-types': ^4.20221111.1
+      web3.storage: ^4.4.0
+    dependencies:
+      web3.storage: 4.4.0
+    devDependencies:
+      '@cloudflare/workers-types': 4.20221111.1
 
 packages:
 
@@ -1335,10 +1343,10 @@ packages:
 
   /@types/node/16.18.10:
     resolution: {integrity: sha512-XU1+v7h81p7145ddPfjv7jtWvkSilpcnON3mQ+bDi9Yuf7OI56efOglXRyXWgQ57xH3fEQgh7WOJMncRHVew5w==}
+    dev: true
 
   /@types/node/18.14.0:
     resolution: {integrity: sha512-5EWrvLmglK+imbCJY0+INViFWUHg1AHel1sq4ZVSfdcNqGy9Edv3UB9IIzzg+xPaUcAgZYcfVs2fBcwDeZzU0A==}
-    dev: true
 
   /@types/normalize-package-data/2.4.1:
     resolution: {integrity: sha512-Gj7cI7z+98M282Tqmp2K5EIsoouUEzbBJhQQzDE3jSIRk6r9gsz0oUokqIUR4u1R3dMHo0pDHM7sNOHyhulypw==}
@@ -6308,7 +6316,7 @@ packages:
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.0
       '@types/long': 4.0.2
-      '@types/node': 16.18.10
+      '@types/node': 18.14.0
       long: 4.0.0
     dev: false
 

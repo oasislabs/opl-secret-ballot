@@ -1,1 +1,1 @@
-packages: [frontend, backend]
+packages: [frontend, backend, functions]

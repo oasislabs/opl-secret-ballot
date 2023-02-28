@@ -2,7 +2,7 @@
 import { reactive } from 'vue';
 import { ContentLoader } from 'vue-content-loader';
 
-import type { Poll } from '../../functions/api/types';
+import type { Poll } from '../../../functions/api/types';
 import type { DAOv1 } from '../contracts';
 import { useDAOv1 } from '../contracts';
 import { Network, useEthereumStore } from '../stores/ethereum';
