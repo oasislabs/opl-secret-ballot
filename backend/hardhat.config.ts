@@ -6,7 +6,6 @@ import { TASK_COMPILE } from 'hardhat/builtin-tasks/task-names';
 import { HardhatUserConfig, task } from 'hardhat/config';
 
 import '@oasisprotocol/sapphire-hardhat';
-import '@nomiclabs/hardhat-waffle';
 import '@typechain/hardhat';
 import 'hardhat-watcher';
 import 'solidity-coverage';

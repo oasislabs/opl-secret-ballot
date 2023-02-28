@@ -39,7 +39,7 @@
   "dependencies": {
     "@ethersproject/abi": "^5.7.0",
     "@ethersproject/providers": "^5.7.2",
-    "@oasisprotocol/sapphire-contracts": "link:/Users/nhynes/Developer/sapphire-paratime/contracts/",
+    "@oasisprotocol/sapphire-contracts": "^0.2.0",
     "@openzeppelin/contracts": "^4.8.1",
     "ethers": "^5.7.2"
   },
@@ -48,7 +48,6 @@
     "@ethersproject/abstract-signer": "^5.7.0",
     "@ethersproject/bytes": "^5.7.0",
     "@nomiclabs/hardhat-ethers": "^2.2.2",
-    "@nomiclabs/hardhat-waffle": "^2.0.5",
     "@oasisprotocol/sapphire-hardhat": "^1.0.3",
     "@typechain/ethers-v5": "^10.2.0",
     "@typechain/hardhat": "^6.1.5",
@@ -57,7 +56,6 @@
     "@types/node": "^18.14.0",
     "canonicalize": "^1.0.8",
     "chai": "^4.3.7",
-    "ethereum-waffle": "^4.0.10",
     "hardhat": "^2.12.7",
     "hardhat-watcher": "^2.5.0",
     "npm-run-all": "^4.1.5",
