@@ -132,9 +132,7 @@ async function doCreatePoll(): Promise<string> {
   };
   // TODO: check if proposal already exists on the host chain and continue if so (idempotence)
   const value = ethers.utils.parseEther('0.005');
-  const proposalId = (await dao.value.callStatic.createProposal(proposalParams, { value })).slice(
-    2,
-  );
+  const proposalId = (await dao.value.callStatic.createProposal(proposalParams, { value }))
   console.log('creating proposal');
   const createProposalTx = await dao.value.createProposal(proposalParams, { value });
   console.log('creating proposal in', createProposalTx.hash);
@@ -146,7 +144,7 @@ async function doCreatePoll(): Promise<string> {
     isActive = await staticBallotBox.callStatic.ballotIsActive(proposalId);
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  return proposalId;
+  return proposalId.replace('0x', '');
 }
 </script>
 
